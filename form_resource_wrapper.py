@@ -43,6 +43,8 @@ def get_command_output(command):
         output = result.strip()
         return output
     except subprocess.CalledProcessError as e:
+        msg = f"An error occurred while executing the command: {e}"
+        logger.error(msg)
         raise(Exception(f"An error occurred while executing the command: {e}"))
 
 def is_ip_address(hostname):
@@ -67,8 +69,10 @@ def get_resource_info(resource_name):
                     if resource['status'] != 'on':
                        raise(Exception(f'Resource {resource_name} status is not on. Exiting.'))
                     return resource
-    raise (Exception(
-        'Resource {} not found. Make sure the resource type is supported!'.format(resource_name)))
+    msg = f'Resource {resource_name} not found. Make sure the resource type is supported!'
+    logger.error(msg)
+    raise(Exception(msg))
+
 
 def get_resource_workdir(resource_info, public_ip):
     coaster_properties = json.loads(resource_info['coasterproperties'])
@@ -128,6 +132,7 @@ def get_resource_info_with_verified_ip(resource_name, timeout = 600):
         time.sleep(5)
         if time.time() - start_time > timeout:
             msg = f'Valid IP address not found for resource {resource_name}. Exiting application.'
+            logger.error(msg)
             raise(Exception(msg))
 
 
