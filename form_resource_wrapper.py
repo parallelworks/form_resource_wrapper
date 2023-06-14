@@ -19,13 +19,18 @@ def get_logger(log_file, name, level = logging.INFO):
     logger.addHandler(handler)
     return logging.getLogger(name)
 
+os.makedirs(RESOURCES_DIR, exist_ok = True)
+log_file = os.path.join(RESOURCES_DIR, os.path.basename(__file__).replace('py', 'log'))
+logger = get_logger(log_file, 'resource_wrapper')
+
 def establish_ssh_connection(ip_address, username):
     try:
         if '@' in ip_address:
-            command = f"{SSH_CMD} {ip_address} exit"
+            command = f"{SSH_CMD} {ip_address} hostname"
         else:
-            command = f"{SSH_CMD} {username}@{ip_address} exit"
-
+            command = f"{SSH_CMD} {username}@{ip_address} hostname"
+        
+        logger.info(f'Testing SSH connection with command <{command}>')
         subprocess.run(command, check=True, shell=True)
         return True
     except subprocess.CalledProcessError as e:
@@ -66,6 +71,7 @@ def get_resource_info(resource_name):
 
 def get_resource_workdir(resource_info, public_ip):
     coaster_properties = json.loads(resource_info['coasterproperties'])
+    workdir = None
     if 'workdir' in coaster_properties:
         workdir = coaster_properties['workdir']
     
@@ -223,25 +229,21 @@ def create_resource_directory(label, inputs_dict):
 
     create_batch_header(inputs_dict, header_sh)
 
-
-os.makedirs(RESOURCES_DIR, exist_ok = True)
-log_file = os.path.join(RESOURCES_DIR, os.path.basename(__file__).replace('py', 'log'))
-logger = get_logger(log_file, 'resource_wrapper')
-
-with open('inputs.json') as inputs_json:
-    inputs_dict = json.load(inputs_json)
-
-# Find all resource labels
-resource_labels = [label.replace('pwrl_','') for label in inputs_dict.keys() if label.startswith('pwrl_')]
-
-if not resource_labels:
-    logger.info('No resource labels found. Exiting wrapper.')
-    exit()
-
-logger.info('Resource labels: [{}]'.format(', '.join(resource_labels)))
-
-for label in resource_labels:
-    label_inputs_dict = inputs_dict[f'pwrl_{label}']
-    label_inputs_dict = complete_resource_information(label_inputs_dict)
-    create_resource_directory(label, label_inputs_dict)
+if __name__ == '__main__':
+    with open('inputs.json') as inputs_json:
+        inputs_dict = json.load(inputs_json)
+        
+    # Find all resource labels
+    resource_labels = [label.replace('pwrl_','') for label in inputs_dict.keys() if label.startswith('pwrl_')]
+    
+    if not resource_labels:
+        logger.info('No resource labels found. Exiting wrapper.')
+        exit()
+        
+    logger.info('Resource labels: [{}]'.format(', '.join(resource_labels)))
+    
+    for label in resource_labels:
+        label_inputs_dict = inputs_dict[f'pwrl_{label}']
+        label_inputs_dict = complete_resource_information(label_inputs_dict)
+        create_resource_directory(label, label_inputs_dict)
 
