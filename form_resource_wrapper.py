@@ -37,6 +37,7 @@ def establish_ssh_connection(ip_address, username):
         return False
 
 def get_command_output(command):
+    logger.info(f'Running command <{command}>')
     try:
         result = subprocess.check_output(command, shell=True, universal_newlines=True)
         output = result.strip()
@@ -205,6 +206,8 @@ def create_batch_header(inputs_dict, header_sh):
         return
     
     with open(header_sh, 'w') as f:
+        f.write('#/bin/bash\n')
+
         for schd in scheduler_directives:
             if schd:
                 schd.replace('___',' ')
@@ -243,6 +246,7 @@ if __name__ == '__main__':
     logger.info('Resource labels: [{}]'.format(', '.join(resource_labels)))
     
     for label in resource_labels:
+        logger.info(f'Preparing resource <{label}>')
         label_inputs_dict = inputs_dict[f'pwrl_{label}']
         label_inputs_dict = complete_resource_information(label_inputs_dict)
         create_resource_directory(label, label_inputs_dict)
