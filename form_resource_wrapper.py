@@ -225,7 +225,7 @@ def create_resource_directory(label, inputs_dict):
 
 
 os.makedirs(RESOURCES_DIR, exist_ok = True)
-log_file = os.path.join('RESOURCES_DIR', os.path.basename(__file__).replace('py', 'log'))
+log_file = os.path.join(RESOURCES_DIR, os.path.basename(__file__).replace('py', 'log'))
 logger = get_logger(log_file, 'resource_wrapper')
 
 with open('inputs.json') as inputs_json:
