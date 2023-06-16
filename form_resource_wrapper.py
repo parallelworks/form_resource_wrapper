@@ -13,7 +13,7 @@ SSH_CMD: str = 'ssh  -o StrictHostKeyChecking=no'
 PARSL_CLIENT_HOST: str = os.environ['PARSL_CLIENT_HOST']
 PW_API_KEY: str = os.environ['PW_API_KEY']
 MIN_PORT: int = 50000
-MAX_PORT: int = 55000
+MAX_PORT: int = 50500
 
 
 def get_logger(log_file, name, level = logging.INFO):
@@ -51,6 +51,7 @@ def find_available_port_with_socket():
 
 def find_available_port_with_api():
     url = f'https://{PARSL_CLIENT_HOST}/api/v2/usercontainer/getSingleOpenPort?minPort={MIN_PORT}&maxPort={MAX_PORT}&key={PW_API_KEY}'
+    logger.info(f'Get request to {url}')
     res = requests.get(url)
     return res.text()
 
@@ -61,6 +62,7 @@ def find_available_ports(n: int):
         try: 
             port = find_available_port_with_api()
         except:
+            logger.warning('find_available_port_with_api failed')
             port = find_available_port_with_socket()
         
         available_ports.append(port)
@@ -184,7 +186,7 @@ def complete_resource_information(inputs_dict):
     public_ip = get_resource_external_ip(resource_info)
 
     inputs_dict['resource']['publicIp'] = public_ip
-    inputs_dict['resource']['user'] = get_resource_user(resource_info)
+    inputs_dict['resource']['username'] = get_resource_user(resource_info)
     inputs_dict['resource']['type'] = resource_info['type']
     inputs_dict['resource']['workdir'] = get_resource_workdir(resource_info, public_ip)
     inputs_dict['resource']['privateIp'] = get_resource_internal_ip(resource_info, public_ip)
@@ -195,7 +197,7 @@ def complete_resource_information(inputs_dict):
     )
 
     if 'nports' in inputs_dict:
-        inputs_dict['resource']['ports'] = find_available_ports(inputs_dict['nports'])
+        inputs_dict['resource']['ports'] = find_available_ports(int(inputs_dict['nports']))
 
     return inputs_dict
 
@@ -205,6 +207,8 @@ def flatten_dictionary(dictionary, parent_key='', separator='_'):
         new_key = f"{parent_key}{separator}{key}" if parent_key else key
         if isinstance(value, dict):
             flattened_dict.update(flatten_dictionary(value, new_key, separator))
+        if isinstance(value, list):
+            flattened_dict[new_key] = '___'.join([str(i) for i in value])
         else:
             flattened_dict[new_key] = value
     return flattened_dict
@@ -268,6 +272,9 @@ def create_resource_directory(label, inputs_dict):
     inputs_sh = os.path.join(dir, 'inputs.sh')
     header_sh = os.path.join(dir, 'batch_header.sh')
     inputs_dict_flatten = flatten_dictionary(inputs_dict)
+    if 'resource' in inputs_dict_flatten:
+        del inputs_dict_flatten['resource']
+
     os.makedirs(dir, exist_ok=True)
 
     with open(inputs_json, 'w') as f:
