@@ -4,10 +4,17 @@ import logging
 import requests
 import subprocess
 import time
+import random
+import socket 
 
 RESOURCES_DIR: str = 'resources'
 SUPPORTED_RESOURCE_TYPES: list = ['gclusterv2', 'pclusterv2', 'azclusterv2', 'awsclusterv2', 'slurmshv2']
 SSH_CMD: str = 'ssh  -o StrictHostKeyChecking=no'
+PARSL_CLIENT_HOST: str = os.environ['PARSL_CLIENT_HOST']
+PW_API_KEY: str = os.environ['PW_API_KEY']
+MIN_PORT: int = 50000
+MAX_PORT: int = 50800
+
 
 def get_logger(log_file, name, level = logging.INFO):
     formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
@@ -22,6 +29,45 @@ def get_logger(log_file, name, level = logging.INFO):
 os.makedirs(RESOURCES_DIR, exist_ok = True)
 log_file = os.path.join(RESOURCES_DIR, os.path.basename(__file__).replace('py', 'log'))
 logger = get_logger(log_file, 'resource_wrapper')
+
+
+def find_available_port_with_socket():
+    """
+    Only use this function if find_available_port_with_api fails because the ports
+    are not reserved with this function.  
+    """
+    port_range = list(range(MIN_PORT, MAX_PORT + 1))
+    random.shuffle(port_range)
+    
+    for port in port_range:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('localhost', port))
+                return port
+            except socket.error:
+                pass
+    return None
+ 
+
+def find_available_port_with_api():
+    url = f'https://{PARSL_CLIENT_HOST}/api/v2/usercontainer/getSingleOpenPort?minPort={MIN_PORT}&maxPort={MAX_PORT}&key={PW_API_KEY}'
+    res = requests.get(url)
+    return res.text()
+
+
+def find_available_ports(n: int):
+    available_ports = []
+    for i in range(n):
+        try: 
+            port = find_available_port_with_api()
+        except:
+            port = find_available_port_with_socket()
+        
+        available_ports.append(port)
+    
+    return available_ports
+
+
 
 def establish_ssh_connection(ip_address, username):
     try:
@@ -148,6 +194,8 @@ def complete_resource_information(inputs_dict):
         *os.getcwd().split('/')[-2:]
     )
 
+    if 'nports' in inputs_dict:
+        inputs_dict['resource']['ports'] = find_available_ports(inputs_dict['nports'])
 
     return inputs_dict
 
