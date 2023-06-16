@@ -43,8 +43,6 @@ def get_command_output(command):
         output = result.strip()
         return output
     except subprocess.CalledProcessError as e:
-        msg = f"An error occurred while executing the command: {e}"
-        logger.error(msg)
         raise(Exception(f"An error occurred while executing the command: {e}"))
 
 def is_ip_address(hostname):
@@ -69,10 +67,8 @@ def get_resource_info(resource_name):
                     if resource['status'] != 'on':
                        raise(Exception(f'Resource {resource_name} status is not on. Exiting.'))
                     return resource
-    msg = f'Resource {resource_name} not found. Make sure the resource type is supported!'
-    logger.error(msg)
-    raise(Exception(msg))
-
+    raise (Exception(
+        'Resource {} not found. Make sure the resource type is supported!'.format(resource_name)))
 
 def get_resource_workdir(resource_info, public_ip):
     coaster_properties = json.loads(resource_info['coasterproperties'])
@@ -105,8 +101,8 @@ def get_resource_external_ip(resource_info):
 
 def get_resource_internal_ip(resource_info, public_ip):
     coaster_properties = json.loads(resource_info['coasterproperties'])
-    if 'internalIp' in coaster_properties:
-        internal_ip = coaster_properties['internalIp']
+    if 'privateIp' in coaster_properties:
+        internal_ip = coaster_properties['privateIp']
     else:
         internal_ip = ''
 
@@ -117,8 +113,9 @@ def get_resource_internal_ip(resource_info, public_ip):
     else:
         remote_command = f"/usr/sbin/ifconfig {internal_ip} | sed -En -e 's/.*inet ([0-9.]+).*/\\1/p'"
         command = f"{SSH_CMD} {public_ip} \"{remote_command}\""
-
-    return get_command_output(command)
+    
+    internal_ip = get_command_output(command)
+    return internal_ip.split(' ')[0]
 
 def get_resource_info_with_verified_ip(resource_name, timeout = 600):
     start_time = time.time()
@@ -132,7 +129,6 @@ def get_resource_info_with_verified_ip(resource_name, timeout = 600):
         time.sleep(5)
         if time.time() - start_time > timeout:
             msg = f'Valid IP address not found for resource {resource_name}. Exiting application.'
-            logger.error(msg)
             raise(Exception(msg))
 
 
@@ -145,7 +141,7 @@ def complete_resource_information(inputs_dict):
     inputs_dict['resource']['user'] = get_resource_user(resource_info)
     inputs_dict['resource']['type'] = resource_info['type']
     inputs_dict['resource']['workdir'] = get_resource_workdir(resource_info, public_ip)
-    inputs_dict['resource']['internalIp'] = get_resource_internal_ip(resource_info, public_ip)
+    inputs_dict['resource']['privateIp'] = get_resource_internal_ip(resource_info, public_ip)
     inputs_dict['resource']['jobdir'] = os.path.join(
         inputs_dict['resource']['workdir'],
         'pw/jobs',
@@ -211,8 +207,6 @@ def create_batch_header(inputs_dict, header_sh):
         return
     
     with open(header_sh, 'w') as f:
-        f.write('#/bin/bash\n')
-
         for schd in scheduler_directives:
             if schd:
                 schd.replace('___',' ')
