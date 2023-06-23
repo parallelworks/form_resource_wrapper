@@ -13,7 +13,7 @@ SSH_CMD: str = 'ssh  -o StrictHostKeyChecking=no'
 PARSL_CLIENT_HOST: str = os.environ['PARSL_CLIENT_HOST']
 PW_API_KEY: str = os.environ['PW_API_KEY']
 MIN_PORT: int = 50000
-MAX_PORT: int = 50500
+MAX_PORT: int = 55000
 
 
 def get_logger(log_file, name, level = logging.INFO):
