@@ -13,7 +13,7 @@ SSH_CMD: str = 'ssh  -o StrictHostKeyChecking=no'
 PARSL_CLIENT_HOST: str = os.environ['PARSL_CLIENT_HOST']
 PW_API_KEY: str = os.environ['PW_API_KEY']
 MIN_PORT: int = 50000
-MAX_PORT: int = 55000
+MAX_PORT: int = 50500
 
 
 def get_logger(log_file, name, level = logging.INFO):
@@ -180,6 +180,14 @@ def get_resource_info_with_verified_ip(resource_name, timeout = 600):
             raise(Exception(msg))
 
 
+def replace_placeholders(inputs_dict, placeholder_dict):
+    for ik,iv in inputs_dict.items():
+        if type(iv) == str:
+            for pk, pv in placeholder_dict.items():
+                if pk in iv:
+                    inputs_dict[ik] =iv.replace(pk, pv)
+    return inputs_dict 
+
 def complete_resource_information(inputs_dict):
     resource_name = inputs_dict['resource']['name']
     resource_info = get_resource_info_with_verified_ip(resource_name)
@@ -198,6 +206,14 @@ def complete_resource_information(inputs_dict):
 
     if 'nports' in inputs_dict:
         inputs_dict['resource']['ports'] = find_available_ports(int(inputs_dict['nports']))
+
+
+    inputs_dict = replace_placeholders(
+        inputs_dict, 
+        {
+            '__workdir__': inputs_dict['resource']['workdir']
+        }
+    )
 
     return inputs_dict
 
