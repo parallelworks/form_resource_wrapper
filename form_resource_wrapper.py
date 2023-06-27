@@ -71,8 +71,10 @@ def find_available_ports(n: int):
 
 
 
-def establish_ssh_connection(ip_address, username):
+def establish_ssh_connection(resource_info):    
     try:
+        ip_address = get_resource_external_ip(resource_info)
+        username = get_resource_user(resource_info)
         if '@' in ip_address:
             command = f"{SSH_CMD} {ip_address} hostname"
         else:
@@ -81,7 +83,12 @@ def establish_ssh_connection(ip_address, username):
         logger.info(f'Testing SSH connection with command <{command}>')
         subprocess.run(command, check=True, shell=True)
         return True
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
+        msg = 'Unable to stablish SSH connection to resource <{name}> with namespace <{namespace}>'.format(
+            name = resource_info['name'],
+            namespace = resource_info['namespace']
+        )
+        logger.info(msg)
         return False
 
 def get_command_output(command):
@@ -169,15 +176,21 @@ def get_resource_info_with_verified_ip(resource_name, timeout = 600):
     start_time = time.time()
     while True:
         resource_info =  get_resource_info(resource_name)
-        ip_address = get_resource_external_ip(resource_info)
-        username = get_resource_user(resource_info)
-        if establish_ssh_connection(ip_address, username):
+        if establish_ssh_connection(resource_info):
             return resource_info
         
         time.sleep(5)
         if time.time() - start_time > timeout:
             msg = f'Valid IP address not found for resource {resource_name}. Exiting application.'
+            logger.error(msg)
             raise(Exception(msg))
+
+        msg = 'Retrying SSH connection to resource <{name}> with namespace <{namespace}>'.format(
+            name = resource_info['name'],
+            namespace = resource_info['namespace']
+        )
+
+        logger.info(msg)
 
 
 def replace_placeholders(inputs_dict, placeholder_dict):
@@ -211,7 +224,8 @@ def complete_resource_information(inputs_dict):
     inputs_dict = replace_placeholders(
         inputs_dict, 
         {
-            '__workdir__': inputs_dict['resource']['workdir']
+            '__workdir__': inputs_dict['resource']['workdir'],
+            '__WORKDIR__': inputs_dict['resource']['workdir']
         }
     )
 
