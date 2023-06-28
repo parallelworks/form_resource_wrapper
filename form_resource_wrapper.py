@@ -257,7 +257,10 @@ def get_scheduler_directives_from_input_form(inputs_dict):
 
 
 def create_batch_header(inputs_dict, header_sh):
-    scheduler_directives = inputs_dict['scheduler_directives'].split(';')
+    if 'scheduler_directives' in inputs_dict:
+        scheduler_directives = inputs_dict['scheduler_directives'].split(';')
+    else:
+        scheduler_directives = []
     scheduler_directives += get_scheduler_directives_from_input_form(inputs_dict)
 
     jobnumber = os.path.basename(os.getcwd())
