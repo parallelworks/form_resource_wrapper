@@ -100,7 +100,7 @@ def is_ip_address(hostname):
     return False
 
 
-def get_resource_info(resource_name):
+def get_resource_info(resource_id):
     resource_info = {}
 
     url_resources = 'https://' + \
@@ -110,14 +110,14 @@ def get_resource_info(resource_name):
     res = requests.get(url_resources)
 
     for resource in res.json():
-        if type(resource['name']) == str:
+        if type(resource['id']) == str:
             if resource['type'] in SUPPORTED_RESOURCE_TYPES:
-                if resource['name'].lower().replace('_', '') == resource_name.lower().replace('_', ''):
+                if resource['id'].lower().replace('_', '') == resource_id:
                     if resource['status'] != 'on':
-                       raise(Exception(f'Resource {resource_name} status is not on. Exiting.'))
+                       raise(Exception(f'Resource {resource_id} status is not on. Exiting.'))
                     return resource
     raise (Exception(
-        'Resource {} not found. Make sure the resource type is supported!'.format(resource_name)))
+        'Resource {} not found. Make sure the resource type is supported!'.format(resource_id)))
 
 def get_resource_workdir(resource_info, public_ip):
     coaster_properties = json.loads(resource_info['coasterproperties'])
@@ -166,10 +166,10 @@ def get_resource_internal_ip(resource_info, public_ip):
     internal_ip = get_command_output(command)
     return internal_ip.split(' ')[0]
 
-def get_resource_info_with_verified_ip(resource_name, timeout = 600):
+def get_resource_info_with_verified_ip(resource_id, timeout = 600):
     start_time = time.time()
     while True:
-        resource_info =  get_resource_info(resource_name)
+        resource_info =  get_resource_info(resource_id)
         ip_address = get_resource_external_ip(resource_info)
         username = get_resource_user(resource_info)
         if establish_ssh_connection(ip_address, username):
@@ -177,7 +177,7 @@ def get_resource_info_with_verified_ip(resource_name, timeout = 600):
         
         time.sleep(5)
         if time.time() - start_time > timeout:
-            msg = f'Valid IP address not found for resource {resource_name}. Exiting application.'
+            msg = f'Valid IP address not found for resource {resource_id}. Exiting application.'
             raise(Exception(msg))
 
 
@@ -190,8 +190,7 @@ def replace_placeholders(inputs_dict, placeholder_dict):
     return inputs_dict 
 
 def complete_resource_information(inputs_dict):
-    resource_name = inputs_dict['resource']['name']
-    resource_info = get_resource_info_with_verified_ip(resource_name)
+    resource_info = get_resource_info_with_verified_ip(inputs_dict['resource']['id'])
     public_ip = get_resource_external_ip(resource_info)
 
     inputs_dict['resource']['publicIp'] = public_ip
