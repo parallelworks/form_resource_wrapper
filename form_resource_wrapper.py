@@ -13,7 +13,7 @@ SSH_CMD: str = 'ssh  -o StrictHostKeyChecking=no'
 PARSL_CLIENT_HOST: str = os.environ['PARSL_CLIENT_HOST']
 PW_API_KEY: str = os.environ['PW_API_KEY']
 MIN_PORT: int = 50000
-MAX_PORT: int = 50500
+MAX_PORT: int = 55500
 
 
 def get_logger(log_file, name, level = logging.INFO):
@@ -72,8 +72,10 @@ def find_available_ports(n: int):
 
 
 
-def establish_ssh_connection(ip_address, username):
+def establish_ssh_connection(resource_info):    
     try:
+        ip_address = get_resource_external_ip(resource_info)
+        username = get_resource_user(resource_info)
         if '@' in ip_address:
             command = f"{SSH_CMD} {ip_address} hostname"
         else:
@@ -82,7 +84,12 @@ def establish_ssh_connection(ip_address, username):
         logger.info(f'Testing SSH connection with command <{command}>')
         subprocess.run(command, check=True, shell=True)
         return True
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
+        msg = 'Unable to stablish SSH connection to resource <{name}> with namespace <{namespace}>'.format(
+            name = resource_info['name'],
+            namespace = resource_info['namespace']
+        )
+        logger.info(msg)
         return False
 
 def get_command_output(command):
@@ -112,7 +119,7 @@ def get_resource_info(resource_id):
     for resource in res.json():
         if type(resource['id']) == str:
             if resource['type'] in SUPPORTED_RESOURCE_TYPES:
-                if resource['id'].lower().replace('_', '') == resource_id:
+                if resource['id'].lower().replace('_', '') == resource_id.lower().replace('_', ''):
                     if resource['status'] != 'on':
                        raise(Exception(f'Resource {resource_id} status is not on. Exiting.'))
                     return resource
@@ -170,15 +177,21 @@ def get_resource_info_with_verified_ip(resource_id, timeout = 600):
     start_time = time.time()
     while True:
         resource_info =  get_resource_info(resource_id)
-        ip_address = get_resource_external_ip(resource_info)
-        username = get_resource_user(resource_info)
-        if establish_ssh_connection(ip_address, username):
+        if establish_ssh_connection(resource_info):
             return resource_info
         
         time.sleep(5)
         if time.time() - start_time > timeout:
             msg = f'Valid IP address not found for resource {resource_id}. Exiting application.'
+            logger.error(msg)
             raise(Exception(msg))
+
+        msg = 'Retrying SSH connection to resource <{name}> with namespace <{namespace}>'.format(
+            name = resource_info['name'],
+            namespace = resource_info['namespace']
+        )
+
+        logger.info(msg)
 
 
 def replace_placeholders(inputs_dict, placeholder_dict):
@@ -190,7 +203,8 @@ def replace_placeholders(inputs_dict, placeholder_dict):
     return inputs_dict 
 
 def complete_resource_information(inputs_dict):
-    resource_info = get_resource_info_with_verified_ip(inputs_dict['resource']['id'])
+    resource_id = inputs_dict['resource']['id']
+    resource_info = get_resource_info_with_verified_ip(resource_id)
     public_ip = get_resource_external_ip(resource_info)
 
     inputs_dict['resource']['publicIp'] = public_ip
@@ -284,8 +298,6 @@ def create_batch_header(inputs_dict, header_sh):
                 schd.replace('___',' ')
                 f.write(f'{directive_prefix} {schd}\n')
         
-        f.write(f'cd {jobdir}\n')
-
 def create_resource_directory(label, inputs_dict):
     dir = os.path.join(RESOURCES_DIR, label)
     inputs_json = os.path.join(dir, 'inputs.json')
@@ -325,4 +337,3 @@ if __name__ == '__main__':
         label_inputs_dict = complete_resource_information(label_inputs_dict)
         logger.info(json.dumps(label_inputs_dict, indent = 4))
         create_resource_directory(label, label_inputs_dict)
-
